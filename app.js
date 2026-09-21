@@ -18,7 +18,7 @@ const MAX_GAMES_IN_ROTATION = 50;
 
 // ---- Board state ----
 
-const PIECES = {♔
+const PIECES = {
   white: { k: '♕', q: '♔', r: '♖', b: '♗', n: '♘', p: '♙' },
   black: { k: '♛', q: '♚', r: '♜', b: '♝', n: '♞', p: '♟' },
 };
