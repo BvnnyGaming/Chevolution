@@ -1,12 +1,20 @@
 // ---- Config ----
 
-// Path to your game log, relative to index.html (no leading slash, so it works on project Pages sites).
-// Expected format: JSON Lines, one game object per line.
-const GAMES_FILE = 'games.jsonl';
+const GAMES_FILE = 'games/games.jsonl';
 
 const MOVE_DELAY_MS = 5000;
 const END_OF_GAME_PAUSE_MS = 3000;
-const POLL_WHEN_WAITING_MS = 30000;
+const POLL_GAMES_MS = 60000;        // how often to check for newly pushed games
+const POLL_WHEN_EMPTY_MS = 5000;    // faster retry while nothing has loaded yet
+const TICK_MS = 250;                // how often the display re-checks the clock
+
+// Everyone shares this fixed start point, so every visitor sees the same
+// moment of the same game. Changing it (or MOVE_DELAY_MS) shifts the schedule
+// for everybody.
+const EPOCH_MS = Date.UTC(2026, 0, 1);
+
+// Only the newest N games are cycled through (0 = every game ever logged).
+const MAX_GAMES_IN_ROTATION = 50;
 
 // ---- Board state ----
 
@@ -98,24 +106,6 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
-// ---- Recent games list ----
-
-const recentGames = [];
-
-function pushRecent(gameIndex, game) {
-  const { text, cls } = resultLabel(game.result);
-  recentGames.unshift({ label: `#${gameIndex}`, text, cls });
-  if (recentGames.length > 8) recentGames.pop();
-  const list = document.getElementById('recentList');
-  list.innerHTML = '';
-  for (const g of recentGames) {
-    const row = document.createElement('div');
-    row.className = 'recent-row';
-    row.innerHTML = `<span>${g.label}</span><span class="res ${g.cls}">${g.text}</span>`;
-    list.appendChild(row);
-  }
-}
-
 // ---- Data loading ----
 
 // Reads the whole log and returns an array of game objects, oldest first.
@@ -141,67 +131,152 @@ async function loadGames() {
   return games;
 }
 
-// ---- Playback ----
+// ---- Schedule ----
+//
+// There is no server running the games, so the "broadcast" is computed from
+// the clock instead: the rotation of games is laid end to end on a timeline
+// starting at EPOCH_MS and repeating forever. Whoever opens the page at any
+// moment lands on the same game and the same move as everyone else, and
+// reloading just puts you back at the current point.
 
-async function playGame(gameIndex, game) {
-  boardState = freshBoard();
-  buildBoardDom();
-  renderBoard(null);
+let rotation = [];   // [{ game, number, startMs, durationMs }], oldest first
+let cycleMs = 0;
+let loadedCount = -1;
 
-  document.getElementById('gameId').textContent = shortId(game.id);
-  document.getElementById('gameNumber').textContent = `Game #${gameIndex}`;
-  document.getElementById('modelStep').textContent = game.model_step ?? '—';
-  document.getElementById('mctsIters').textContent = game.mcts_iterations ?? '—';
-  document.getElementById('result').textContent = '—';
-  document.getElementById('result').className = 'v';
-  setStatus('Playing…');
-
-  const moves = game.moves || [];
-  for (let i = 0; i < moves.length; i++) {
-    applyMove(moves[i]);
-    renderBoard(moves[i]);
-    document.getElementById('plyProgress').textContent = `${i + 1} / ${moves.length}`;
-    await sleep(MOVE_DELAY_MS);
-  }
-
-  const { text, cls } = resultLabel(game.result);
-  document.getElementById('result').textContent = text;
-  document.getElementById('result').className = `v ${cls}`;
-  document.getElementById('duration').textContent = formatDuration(game.started_at, game.finished_at);
-  setStatus('Game finished.');
-  pushRecent(gameIndex, game);
-
-  await sleep(END_OF_GAME_PAUSE_MS);
+function gameDurationMs(game) {
+  return (game.moves ? game.moves.length : 0) * MOVE_DELAY_MS + END_OF_GAME_PAUSE_MS;
 }
 
-async function main() {
-  let index = 0;
+function buildRotation(all) {
+  const first = MAX_GAMES_IN_ROTATION > 0
+    ? Math.max(0, all.length - MAX_GAMES_IN_ROTATION)
+    : 0;
+  let t = 0;
+  rotation = all.slice(first).map((game, i) => {
+    const durationMs = gameDurationMs(game);
+    const entry = { game, number: first + i, startMs: t, durationMs };
+    t += durationMs;
+    return entry;
+  });
+  cycleMs = t;
+}
+
+function currentPosition() {
+  const t = (((Date.now() - EPOCH_MS) % cycleMs) + cycleMs) % cycleMs;
+
+  let idx = 0;
+  for (let i = 0; i < rotation.length; i++) {
+    if (rotation[i].startMs <= t) idx = i;
+    else break;
+  }
+
+  const entry = rotation[idx];
+  const moveCount = entry.game.moves ? entry.game.moves.length : 0;
+  const elapsed = t - entry.startMs;
+
+  return {
+    idx,
+    entry,
+    ply: Math.min(moveCount, Math.floor(elapsed / MOVE_DELAY_MS) + 1),
+    finished: elapsed >= moveCount * MOVE_DELAY_MS,
+  };
+}
+
+// ---- Display ----
+
+let shownKey = null;
+let shownGameKey = null;
+
+function renderRecent(idx) {
+  const list = document.getElementById('recentList');
+  list.innerHTML = '';
+  const n = rotation.length;
+  for (let k = 1; k <= Math.min(8, n - 1); k++) {
+    const prev = rotation[(idx - k + n) % n];
+    const { text, cls } = resultLabel(prev.game.result);
+    const row = document.createElement('div');
+    row.className = 'recent-row';
+    row.innerHTML = `<span>#${prev.number}</span><span class="res ${cls}">${text}</span>`;
+    list.appendChild(row);
+  }
+}
+
+function render() {
+  if (rotation.length === 0) return;
+
+  const { idx, entry, ply, finished } = currentPosition();
+  const { game, number } = entry;
+  const moves = game.moves || [];
+
+  const gameKey = `${number}:${game.id}`;
+  const key = `${gameKey}:${ply}:${finished}`;
+  if (key === shownKey) return;
+  const gameChanged = gameKey !== shownGameKey;
+  shownKey = key;
+  shownGameKey = gameKey;
+
+  if (gameChanged) {
+    document.getElementById('gameId').textContent = shortId(game.id);
+    document.getElementById('gameNumber').textContent = `Game #${number}`;
+    document.getElementById('modelStep').textContent = game.model_step ?? '—';
+    document.getElementById('mctsIters').textContent = game.mcts_iterations ?? '—';
+    renderRecent(idx);
+  }
+
+  // Rebuild the position from the start; cheap, and it means joining or
+  // reloading mid-game shows exactly the right board.
+  boardState = freshBoard();
+  for (let i = 0; i < ply; i++) applyMove(moves[i]);
+  renderBoard(ply > 0 ? moves[ply - 1] : null);
+  document.getElementById('plyProgress').textContent = `${ply} / ${moves.length}`;
+
+  if (finished) {
+    const { text, cls } = resultLabel(game.result);
+    document.getElementById('result').textContent = text;
+    document.getElementById('result').className = `v ${cls}`;
+    document.getElementById('duration').textContent = formatDuration(game.started_at, game.finished_at);
+    setStatus('Game finished.');
+  } else {
+    document.getElementById('result').textContent = '—';
+    document.getElementById('result').className = 'v';
+    document.getElementById('duration').textContent = '—';
+    setStatus('Playing…');
+  }
+}
+
+// ---- Main ----
+
+async function refreshGames() {
+  try {
+    const all = await loadGames();
+    if (all.length !== loadedCount) {
+      loadedCount = all.length;
+      buildRotation(all);
+    }
+    if (rotation.length === 0) setStatus(`${GAMES_FILE} has no games yet.`);
+  } catch (e) {
+    console.error(e);
+    // Once something has loaded, keep broadcasting it and retry quietly.
+    if (rotation.length === 0) {
+      setStatus(`Can't load ${GAMES_FILE} — check the file name and that it's pushed.`);
+    }
+  }
+}
+
+async function pollGames() {
+  while (true) {
+    await refreshGames();
+    await sleep(rotation.length ? POLL_GAMES_MS : POLL_WHEN_EMPTY_MS);
+  }
+}
+
+function main() {
   buildBoardDom();
   boardState = freshBoard();
   renderBoard(null);
 
-  while (true) {
-    let games;
-    try {
-      games = await loadGames();
-    } catch (e) {
-      console.error(e);
-      setStatus(`Can't load ${GAMES_FILE} — check the file name and that it's pushed.`);
-      await sleep(POLL_WHEN_WAITING_MS);
-      continue;
-    }
-
-    if (index >= games.length) {
-      setStatus(games.length === 0
-        ? `${GAMES_FILE} has no games yet.`
-        : 'Waiting for the next game…');
-      await sleep(POLL_WHEN_WAITING_MS);
-      continue;
-    }
-
-    await playGame(index, games[index]);
-    index++;
-  }
+  pollGames();
+  setInterval(render, TICK_MS);
 }
 
 main();
