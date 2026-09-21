@@ -2,7 +2,7 @@
 
 // Path to your game log, relative to index.html (no leading slash, so it works on project Pages sites).
 // Expected format: JSON Lines, one game object per line.
-const GAMES_FILE = 'games.jsonl';
+const GAMES_FILE = 'games/games.jsonl';
 
 const MOVE_DELAY_MS = 5000;
 const END_OF_GAME_PAUSE_MS = 3000;
