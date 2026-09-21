@@ -18,9 +18,9 @@ const MAX_GAMES_IN_ROTATION = 50;
 
 // ---- Board state ----
 
-const PIECES = {
-  white: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  black: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+const PIECES = {♔
+  white: { k: '♕', q: '♔', r: '♖', b: '♗', n: '♘', p: '♙' },
+  black: { k: '♛', q: '♚', r: '♜', b: '♝', n: '♞', p: '♟' },
 };
 
 let boardState = null;
@@ -28,7 +28,7 @@ let squareEls = [];
 
 function freshBoard() {
   // row 0 = rank 8 (black back rank) ... row 7 = rank 1 (white back rank)
-  const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+  const back = ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'];
   const board = [];
   board.push(back.map(t => ({ type: t, color: 'black' })));
   board.push(Array(8).fill(null).map(() => ({ type: 'p', color: 'black' })));
