@@ -217,7 +217,7 @@ const PIECES = {
 
 const MOVE_DELAY_MS = 5000;
 const END_OF_GAME_PAUSE_MS = 3000;
-const POLL_WHEN_WAITING_MS = 2000;
+const POLL_WHEN_WAITING_MS = 3000;
 
 let boardState = null;
 let squareEls = [];
@@ -308,12 +308,6 @@ function pushRecent(gameIndex, game) {
   }
 }
 
-async function fetchJson(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
-  return res.json();
-}
-
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
@@ -349,6 +343,8 @@ async function playGame(gameIndex, game) {
   await sleep(END_OF_GAME_PAUSE_MS);
 }
 
+const GAMES_DIR = 'games';
+
 async function main() {
   let index = 0;
   buildBoardDom();
@@ -356,29 +352,25 @@ async function main() {
   renderBoard(null);
 
   while (true) {
-    let count;
+    let game = null;
     try {
-      ({ count } = await fetchJson('/api/games/count'));
-    } catch (e) {
-      document.getElementById('statusLine').textContent = 'Cannot reach server — is server.py running?';
-      await sleep(POLL_WHEN_WAITING_MS);
-      continue;
-    }
-
-    if (index >= count) {
-      document.getElementById('statusLine').textContent = 'Waiting for the next game…';
-      await sleep(POLL_WHEN_WAITING_MS);
-      continue;
-    }
-
-    try {
-      const game = await fetchJson(`/api/games/${index}`);
-      await playGame(index, game);
-      index++;
+      const res = await fetch(`${GAMES_DIR}/${index}.json`, { cache: 'no-store' });
+      if (res.status === 404) {
+        document.getElementById('statusLine').textContent = 'Waiting for the next game…';
+        await sleep(POLL_WHEN_WAITING_MS);
+        continue;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      game = await res.json();
     } catch (e) {
       console.error(e);
+      document.getElementById('statusLine').textContent = 'Could not load games.';
       await sleep(POLL_WHEN_WAITING_MS);
+      continue;
     }
+
+    await playGame(index, game);
+    index++;
   }
 }
 
