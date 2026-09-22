@@ -28,7 +28,7 @@ let squareEls = [];
 
 function freshBoard() {
   // row 0 = rank 8 (black back rank) ... row 7 = rank 1 (white back rank)
-  const back = ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'];
+  const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
   const board = [];
   board.push(back.map(t => ({ type: t, color: 'black' })));
   board.push(Array(8).fill(null).map(() => ({ type: 'p', color: 'black' })));
@@ -207,7 +207,7 @@ function enterReview(entry, ply = 0) {
 }
 
 function exitReview(){
-  viewmode = 'live';
+  viewMode = 'live';
   reviewEntry = null;
   shownKey = null;
   shownGameKey = null;
@@ -231,6 +231,11 @@ function renderReview(){
   document.getElementById('gameId').textContent = shortId(game.id);
   document.getElementById('gameNumber').textContent = `Game #${number} (review)`;
   document.getElementById('modelStep').textContent = game.model_step ?? '-';
+
+  boardState = freshBoard();
+  for (let i = 0; i < ply; i++) applyMove(moves[i]);
+  renderBoard(ply > 0 ? moves[ply - 1] : null);
+  document.getElementById('moves').textContent = `${ply}`;
 
   if (finished) {
     const { text, cls } = resultLabel(game.result);
