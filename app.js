@@ -201,7 +201,7 @@ let reviewPly = 0;
 function enterReview(entry, ply = 0) {
   viewMode = 'review';
   reviewEntry = entry;
-  reviewPly = Math.Max(0, Math.min(ply, (entry.game.moves || []).length));
+  reviewPly = Math.max(0, Math.min(ply, (entry.game.moves || []).length));
   document.getElementById('liveBtn').style.display = 'inline-block';
   renderReview()
 }
