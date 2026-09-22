@@ -11,7 +11,7 @@ const TICK_MS = 250;                // how often the display re-checks the clock
 // Everyone shares this fixed start point, so every visitor sees the same
 // moment of the same game. Changing it (or MOVE_DELAY_MS) shifts the schedule
 // for everybody.
-const EPOCH_MS = Date.UTC(2026, 8, 21);
+const EPOCH_MS = Date.UTC(2026, 0, 1);
 
 // Only the newest N games are cycled through (0 = every game ever logged).
 const MAX_GAMES_IN_ROTATION = 50;
