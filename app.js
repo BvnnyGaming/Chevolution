@@ -11,7 +11,7 @@ const TICK_MS = 250;                // how often the display re-checks the clock
 // Everyone shares this fixed start point, so every visitor sees the same
 // moment of the same game. Changing it (or MOVE_DELAY_MS) shifts the schedule
 // for everybody.
-const EPOCH_MS = Date.UTC(2026, 0, 1);
+const EPOCH_MS = Date.UTC(2026, 8, 21);
 
 // Only the newest N games are cycled through (0 = every game ever logged).
 const MAX_GAMES_IN_ROTATION = 50;
@@ -19,8 +19,13 @@ const MAX_GAMES_IN_ROTATION = 50;
 // ---- Board state ----
 
 const PIECES = {
+<<<<<<< HEAD
   white: { k: 'images/bk.png', q: 'images/bq.png', r: 'images/br.png', b: 'images/bb.png', n: 'images/bn.png', p: 'images/bp.png' },
   black: { k: 'images/wk.png', q: 'images/wq.png', r: 'images/wr.png', b: 'images/wb.png', n: 'images/wn.png', p: 'images/wp.png' },
+=======
+  white: { k: '♕', q: '♔', r: '♖', b: '♗', n: '♘', p: '♙' },
+  black: { k: '♛', q: '♚', r: '♜', b: '♝', n: '♞', p: '♟' },
+>>>>>>> 03049ae7740a718feed80dd4b43b9f53beb1f95f
 };
 
 let boardState = null;
@@ -28,7 +33,7 @@ let squareEls = [];
 
 function freshBoard() {
   // row 0 = rank 8 (black back rank) ... row 7 = rank 1 (white back rank)
-  const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+  const back = ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'];
   const board = [];
   board.push(back.map(t => ({ type: t, color: 'black' })));
   board.push(Array(8).fill(null).map(() => ({ type: 'p', color: 'black' })));
