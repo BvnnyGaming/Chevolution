@@ -198,12 +198,28 @@ let viewMode = 'live';
 let reviewEntry = null; //entry rotation
 let reviewPly = 0;
 
-function enterReview(entry, ply = 0) {
+function isReviewingLiveGame() {
+  if (viewMode !== 'review' || !reviewEntry) return false;
+  const live = currentPosition();
+  return live.entry.number === reviewEntry.number && live.entry.game.id === reviewEntry.game.id;
+}
+
+function enterReview(entry, ply) {
+  const moves = entry.game.moves || [];
+  const live = currentPosition();
+  const isLiveGame = live.entry.number === entry.number && live.entry.game.id === entry.game.id;
+  const maxPly = isLiveGame ? Math.min(moves.length, live.ply) : moves.length;
+  const clampedPly = Math.max(0, Math.min(maxPly, ply));
+
+  if (isLiveGame && clampedPly >= live.ply) {
+    return;
+  }
+
   viewMode = 'review';
   reviewEntry = entry;
-  reviewPly = Math.max(0, Math.min(ply, (entry.game.moves || []).length));
+  reviewPly = clampedPly;
   document.getElementById('liveBtn').style.display = 'inline-block';
-  renderReview()
+  renderReview();
 }
 
 function exitReview(){
@@ -215,10 +231,22 @@ function exitReview(){
   render();
 }
 
-function stepReview(delta){
+function stepReview(delta) {
   if (viewMode !== 'review') return;
   const moves = reviewEntry.game.moves || [];
-  reviewPly = Math.max(0, Math.min(moves.length, reviewPly + delta));
+  let maxPly = moves.length;
+
+  if (isReviewingLiveGame()) {
+    maxPly = Math.min(maxPly, currentPosition().ply);
+  }
+
+  reviewPly = Math.max(0, Math.min(maxPly, reviewPly + delta));
+
+  if (isReviewingLiveGame() && reviewPly >= currentPosition().ply) {
+    exitReview();
+    return;
+  }
+
   renderReview();
 }
 
@@ -342,16 +370,13 @@ function main() {
       e.preventDefault();
       if (viewMode === 'live') {
         const { entry, ply } = currentPosition();
-        enterReview(entry, Math.max(0, ply - 1));
+        enterReview(entry, ply - 1);
       } else {
         stepReview(-1);
       }
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
-      if (viewMode === 'live') {
-        const { entry, ply} = currentPosition();
-        enterReview(entry, Math.min((entry.game.moves || []).length, ply + 1));
-      } else {
+      if (viewMode !== 'live') {
         stepReview(1);
       }
     } else if (e.code === 'Space') {
