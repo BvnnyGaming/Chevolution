@@ -192,6 +192,57 @@ function currentPosition() {
 let shownKey = null;
 let shownGameKey = null;
 
+// ---- View mode: live broadcast vs reviewing past game ----
+
+let viewMode = 'live';
+let reviewEntry = null; //entry rotation
+let reviewPly = 0;
+
+function enterReview(entry, ply = 0) {
+  viewMode = 'review';
+  reviewEntry = entry;
+  reviewPly = Math.Max(0, Math.min(ply, (entry.game.moves || []).length));
+  document.getElementById('liveBtn').style.display = 'inline-block';
+  renderReview()
+}
+
+function exitReview(){
+  viewmode = 'live';
+  reviewEntry = null;
+  shownKey = null;
+  shownGameKey = null;
+  document.getElementById('liveBtn').style.display = 'none';
+  render();
+}
+
+function stepReview(delta){
+  if (viewMode !== 'review') return;
+  const moves = reviewEntry.game.moves || [];
+  reviewPly = Math.max(0, Math.min(moves.length, reviewPly + delta));
+  renderReview();
+}
+
+function renderReview(){
+  const { game, number } = reviewEntry;
+  const moves = game.moves || [];
+  const ply = reviewPly;
+  const  finished = ply >= moves.length;
+
+  document.getElementById('gameId').textContent = shortId(game.id);
+  document.getElementById('gameNumber').textContent = `Game #${number} (review)`;
+  document.getElementById('modelStep').textContent = game.model_step ?? '-';
+
+  if (finished) {
+    const { text, cls } = resultLabel(game.result);
+    document.getElementById('result').textContent = text;
+    document.getElementById('result').className = `v ${cls}`;
+  } else {
+    document.getElementById('result').textContent = '-';
+    document.getElementById('result').className = 'v';
+  }
+  setStatus(`Reviewing game #${number} - Left and right arrow to navigate, space or "Back to live" to return.`);
+}
+
 function renderRecent(idx) {
   const list = document.getElementById('recentList');
   list.innerHTML = '';
@@ -202,11 +253,13 @@ function renderRecent(idx) {
     const row = document.createElement('div');
     row.className = 'recent-row';
     row.innerHTML = `<span>#${prev.number}</span><span class="res ${cls}">${text}</span>`;
+    row.addEventListener('click', () => enterReview(prev, 0))
     list.appendChild(row);
   }
 }
 
 function render() {
+  if (viewMode !== 'live') return;
   if (rotation.length === 0) return;
 
   const { idx, entry, ply, finished } = currentPosition();
@@ -278,6 +331,31 @@ function main() {
   buildBoardDom();
   boardState = freshBoard();
   renderBoard(null);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowLeft') {
+      e.preventDefault();
+      if (viewMode === 'live') {
+        const { entry, ply } = currentPosition();
+        enterReview(entry, Math.max(0, ply - 1));
+      } else {
+        stepReview(-1);
+      }
+    } else if (e.code === 'ArrowRight') {
+      e.preventDefault();
+      if (viewMode === 'live') {
+        const { entry, ply} = currentPosition();
+        enterReview(entry, Math.min((entry.game.moves || []).length, ply + 1));
+      } else {
+        stepReview(1);
+      }
+    } else if (e.code === 'Space') {
+      e.preventDefault();
+      exitReview();
+    }
+  });
+
+  document.getElementById('liveBtn').addEventListener('click', exitReview);
 
   pollGames();
   setInterval(render, TICK_MS);

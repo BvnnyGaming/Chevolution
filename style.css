@@ -85,6 +85,31 @@ body {
 
 /* ---- Stats panel ---- */
 
+.live-btn {
+  margin: -8px 0 18px;
+  background: var(--accent);
+  color: #14110d;
+  border: none;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.live-btn:hover { 
+  opacity: 0.85; 
+}
+
+.recent-row {
+  cursor: pointer;
+}
+
+.recent-row {
+  color: var(--text);
+}
+
 .stats {
   flex: 1 1 auto;
   min-width: 260px;
