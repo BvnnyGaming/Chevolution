@@ -28,7 +28,7 @@ let squareEls = [];
 
 function freshBoard() {
   // row 0 = rank 8 (black back rank) ... row 7 = rank 1 (white back rank)
-  const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
+  const back = ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'];
   const board = [];
   board.push(back.map(t => ({ type: t, color: 'black' })));
   board.push(Array(8).fill(null).map(() => ({ type: 'p', color: 'black' })));
