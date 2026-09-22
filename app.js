@@ -19,13 +19,8 @@ const MAX_GAMES_IN_ROTATION = 50;
 // ---- Board state ----
 
 const PIECES = {
-<<<<<<< HEAD
   white: { k: 'images/bk.png', q: 'images/bq.png', r: 'images/br.png', b: 'images/bb.png', n: 'images/bn.png', p: 'images/bp.png' },
   black: { k: 'images/wk.png', q: 'images/wq.png', r: 'images/wr.png', b: 'images/wb.png', n: 'images/wn.png', p: 'images/wp.png' },
-=======
-  white: { k: '♕', q: '♔', r: '♖', b: '♗', n: '♘', p: '♙' },
-  black: { k: '♛', q: '♚', r: '♜', b: '♝', n: '♞', p: '♟' },
->>>>>>> 03049ae7740a718feed80dd4b43b9f53beb1f95f
 };
 
 let boardState = null;
