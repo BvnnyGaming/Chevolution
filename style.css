@@ -72,8 +72,8 @@ body {
   background-repeat: no-repeat;
 }
 
-.square.light { background: var(--board-light); }
-.square.dark  { background: var(--board-dark); }
+.square.light { background-color: var(--board-light); }
+.square.dark  { background-color: var( --board-color, var(--board-dark)); }
 
 .square.last-move::after {
   content: "";
