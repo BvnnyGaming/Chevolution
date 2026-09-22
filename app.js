@@ -19,8 +19,8 @@ const MAX_GAMES_IN_ROTATION = 50;
 // ---- Board state ----
 
 const PIECES = {
-  white: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  black: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+  white: { k: 'images/bk.png', q: 'images/bq.png', r: 'images/br.png', b: 'images/bb.png', n: 'images/bn.png', p: 'images/bp.png' },
+  black: { k: 'images/wk.png', q: 'images/wq.png', r: 'images/wr.png', b: 'images/wb.png', n: 'images/wn.png', p: 'images/wp.png' },
 };
 
 let boardState = null;
@@ -61,8 +61,13 @@ function renderBoard(highlight) {
       const piece = boardState[row][col];
       const sq = squareEls[row][col];
       sq.classList.remove('piece-white', 'piece-black', 'last-move');
-      sq.textContent = piece ? PIECES[piece.color][piece.type] : '';
-      if (piece) sq.classList.add(piece.color === 'white' ? 'piece-white' : 'piece-black');
+      sq.textContent = '';
+      if (piece) {
+        sq.classList.add(piece.color === 'white' ? 'piece-white' : 'piece-black');
+        sq.style.backgroundImage = `url(${PIECES[piece.color][piece.type]})` 
+      } else {
+        sq.style.backgroundImage = ''
+      }
     }
   }
   if (highlight) {
@@ -219,7 +224,6 @@ function render() {
     document.getElementById('gameId').textContent = shortId(game.id);
     document.getElementById('gameNumber').textContent = `Game #${number}`;
     document.getElementById('modelStep').textContent = game.model_step ?? '—';
-    document.getElementById('mctsIters').textContent = game.mcts_iterations ?? '—';
     renderRecent(idx);
   }
 
@@ -228,7 +232,7 @@ function render() {
   boardState = freshBoard();
   for (let i = 0; i < ply; i++) applyMove(moves[i]);
   renderBoard(ply > 0 ? moves[ply - 1] : null);
-  document.getElementById('plyProgress').textContent = `${ply} / ${moves.length}`;
+  document.getElementById('moves').textContent = `${ply}`;
 
   if (finished) {
     const { text, cls } = resultLabel(game.result);
