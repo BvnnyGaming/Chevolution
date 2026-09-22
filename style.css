@@ -67,7 +67,7 @@ body {
 
 .square {
   position: relative;
-  background-size: 80%;
+  background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
 }
