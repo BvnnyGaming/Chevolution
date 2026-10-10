@@ -28,7 +28,7 @@ let squareEls = [];
 
 function freshBoard() {
   // row 0 = rank 8 (black back rank) ... row 7 = rank 1 (white back rank)
-  const back = ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'];
+  const back = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];
   const board = [];
   board.push(back.map(t => ({ type: t, color: 'black' })));
   board.push(Array(8).fill(null).map(() => ({ type: 'p', color: 'black' })));
@@ -76,10 +76,25 @@ function renderBoard(highlight) {
   }
 }
 
+function normalizePromotion(p) {
+  if (!p) return 'q';
+  const s = String(p).toLowerCase();
+  if (s === 'knight') return 'n';
+  const c = s[0];
+  return 'qrbn'.includes(c) ? c : 'q';
+}
+
 function applyMove(move) {
   const [fx, fy] = move.from;
   const [tx, ty] = move.to;
-  const piece = boardState[fy][fx];
+  let piece = boardState[fy][fx];
+
+  // Pawn reaching the far rank: row 0 for white, row 7 for black
+  if (piece && piece.type === 'p' &&
+      ((piece.color === 'white' && ty === 0) || (piece.color === 'black' && ty === 7))) {
+    piece = { type: normalizePromotion(move.promotion), color: piece.color };
+  }
+
   boardState[ty][tx] = piece;
   boardState[fy][fx] = null;
 }
