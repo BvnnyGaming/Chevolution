@@ -77,20 +77,46 @@ function renderBoard(highlight) {
 }
 
 function normalizePromotion(p) {
+  // Engine logs promotions as signed piece values: 3 = knight, 5 = queen
+  if (typeof p === 'number') {
+    switch (Math.abs(p)) {
+      case 2: return 'r';
+      case 3: return 'n';
+      case 4: return 'b';
+      case 5: return 'q';
+      default: return 'q';
+    }
+  }
   if (!p) return 'q';
   const s = String(p).toLowerCase();
   if (s === 'knight') return 'n';
-  const c = s[0];
-  return 'qrbn'.includes(c) ? c : 'q';
+  return 'qrbn'.includes(s[0]) ? s[0] : 'q';
 }
 
 function applyMove(move) {
   const [fx, fy] = move.from;
   const [tx, ty] = move.to;
   let piece = boardState[fy][fx];
+  if (!piece) return;
 
-  // Pawn reaching the far rank: row 0 for white, row 7 for black
-  if (piece && piece.type === 'p' &&
+  // En passant: pawn moves diagonally onto an empty square
+  if (piece.type === 'p' && fx !== tx && !boardState[ty][tx]) {
+    boardState[fy][tx] = null; // captured pawn sits beside the mover's start square
+  }
+
+  // Castling: king moves two files, so bring the rook along
+  if (piece.type === 'k' && Math.abs(tx - fx) === 2) {
+    if (tx === 6) {            // kingside
+      boardState[ty][5] = boardState[ty][7];
+      boardState[ty][7] = null;
+    } else if (tx === 2) {     // queenside
+      boardState[ty][3] = boardState[ty][0];
+      boardState[ty][0] = null;
+    }
+  }
+
+  // Promotion
+  if (piece.type === 'p' &&
       ((piece.color === 'white' && ty === 0) || (piece.color === 'black' && ty === 7))) {
     piece = { type: normalizePromotion(move.promotion), color: piece.color };
   }
