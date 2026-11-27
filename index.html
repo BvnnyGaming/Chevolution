@@ -14,27 +14,30 @@
 <div class="layout">
 
   <div class="board-wrapper">
-    <div class="board-label">SELF-PLAY</div>
+    <div class="board-label">SELF-PLAY — REPLAY</div>
     <div class="board-frame">
-      <div class="board" id="board"></div>
+      <div class="board" id="board" role="img" aria-label="Chess board replaying a self-play game"></div>
     </div>
   </div>
 
   <div class="stats">
     <div class="game-id" id="gameId">—</div>
-    <div class="game-number" id="gameNumber">Waiting for games…</div>
-    <button id="liveBtn" class="live-btn" style="display:none;"> Back to live </button>
+    <div class="game-number" id="gameNumber">Loading games…</div>
 
     <div class="stat-row"><span class="k">model step</span><span class="v" id="modelStep">—</span></div>
-    <div class="stat-row"><span class="k">moves</span><span class="v" id="moves">—</span></div>
+    <div class="stat-row"><span class="k">mcts iterations</span><span class="v" id="mctsIters">—</span></div>
+    <div class="stat-row"><span class="k">ply</span><span class="v" id="plyProgress">—</span></div>
     <div class="stat-row"><span class="k">duration</span><span class="v" id="duration">—</span></div>
     <div class="stat-row"><span class="k">result</span><span class="v" id="result">—</span></div>
+    <div class="stat-row"><span class="k">games logged</span><span class="v" id="gamesLogged">—</span></div>
 
     <div class="status-line" id="statusLine"></div>
 
-    <div class="recent">
-      <div class="recent-label">RECENT GAMES</div>
-      <div class="recent-list" id="recentList"></div>
+    <div class="games">
+      <div class="games-label">ALL GAMES</div>
+      <input class="game-search" id="gameSearch" type="text" inputmode="numeric" autocomplete="off"
+             placeholder="Jump to game number" aria-label="Search for a game number">
+      <div class="game-list" id="gameList"></div>
     </div>
   </div>
 
