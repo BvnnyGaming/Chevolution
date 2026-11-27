@@ -1,7 +1,3 @@
-const PIECES = {
-  white: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  black: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
-};
 const TYPE_BY_VALUE = { 1: 'p', 2: 'r', 3: 'n', 4: 'b', 5: 'q', 6: 'k' };
 
 const DATA_URL = 'data/games.jsonl';
@@ -70,16 +66,11 @@ function parseGames(text) {
 // ---- Labels ----
 
 function resultLabel(result) {
+  if (result == null) return { text: '—', cls: '' };
   if (result === 0.5) return { text: 'draw', cls: 'draw' };
   if (result === 1) return { text: 'white wins', cls: 'win' };
   if (result === 0) return { text: 'black wins', cls: 'loss' };
   return { text: String(result), cls: '' };
-}
-
-function formatDuration(start, end) {
-  if (!start || !end) return '—';
-  const secs = Math.max(0, end - start);
-  return secs < 60 ? `${secs.toFixed(1)}s` : `${(secs / 60).toFixed(1)}m`;
 }
 
 // ---- Page ----
@@ -92,7 +83,6 @@ let board = null;
 let squares = [];
 let games = [];
 let current = -1;
-let currentDone = false;
 let runId = 0;
 let query = '';
 
@@ -105,10 +95,21 @@ function buildBoard() {
     for (let x = 0; x < 8; x++) {
       const sq = document.createElement('div');
       sq.className = 'square ' + ((x + y) % 2 === 0 ? 'light' : 'dark');
+      const img = document.createElement('img');
+      img.alt = '';
+      img.draggable = false;
+      img.hidden = true;
+      sq.appendChild(img);
       el.appendChild(sq);
       row.push(sq);
     }
     squares.push(row);
+  }
+}
+
+function preloadPieces() {
+  for (const color of 'wb') {
+    for (const type of 'prnbqk') new Image().src = `images/${color}${type}.png`;
   }
 }
 
@@ -117,9 +118,15 @@ function drawBoard(lastMove) {
     for (let x = 0; x < 8; x++) {
       const piece = board[y][x];
       const sq = squares[y][x];
-      sq.classList.remove('piece-white', 'piece-black', 'last-move');
-      sq.textContent = piece ? PIECES[piece.color][piece.type] : '';
-      if (piece) sq.classList.add('piece-' + piece.color);
+      const img = sq.firstChild;
+      sq.classList.remove('last-move');
+      if (piece) {
+        const file = `images/${piece.color[0]}${piece.type}.png`;
+        if (img.getAttribute('src') !== file) img.src = file;
+        img.hidden = false;
+      } else {
+        img.hidden = true;
+      }
     }
   }
   if (lastMove) {
@@ -136,8 +143,7 @@ function drawList() {
 
   for (let i = games.length - 1; i >= 0; i--) {
     if (query && !String(i).startsWith(query)) continue;
-    const playingNow = i === current && !currentDone;
-    const { text, cls } = playingNow ? { text: 'playing…', cls: '' } : resultLabel(games[i].result);
+    const { text, cls } = resultLabel(games[i].result);
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'game-row' + (i === current ? ' current' : '');
@@ -180,7 +186,6 @@ async function play(index) {
   const id = ++runId;
   const game = games[index];
   current = index;
-  currentDone = false;
   board = freshBoard();
   buildBoard();
   drawBoard(null);
@@ -191,9 +196,9 @@ async function play(index) {
   $('gameNumber').textContent = `Game #${index}`;
   $('modelStep').textContent = game.model_step ?? '—';
   $('mctsIters').textContent = game.mcts_iterations ?? '—';
-  $('duration').textContent = '—';
-  $('result').textContent = '—';
-  $('result').className = 'v';
+  const { text, cls } = resultLabel(game.result);
+  $('result').textContent = text;
+  $('result').className = 'v ' + cls;
   setStatus('Playing…');
 
   const moves = game.moves || [];
@@ -207,13 +212,7 @@ async function play(index) {
     if (id !== runId) return;
   }
 
-  const { text, cls } = resultLabel(game.result);
-  $('result').textContent = text;
-  $('result').className = 'v ' + cls;
-  $('duration').textContent = formatDuration(game.started_at, game.finished_at);
   setStatus('Game finished.');
-  currentDone = true;
-  drawList();
 
   await sleep(END_PAUSE_MS);
   while (id === runId && index + 1 >= games.length) {
@@ -254,6 +253,7 @@ function wireEvents() {
 }
 
 async function main() {
+  preloadPieces();
   buildBoard();
   board = freshBoard();
   drawBoard(null);
