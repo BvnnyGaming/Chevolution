@@ -2,6 +2,7 @@ const TYPE_BY_VALUE = { 1: 'p', 2: 'r', 3: 'n', 4: 'b', 5: 'q', 6: 'k' };
 
 const DATA_URL = 'data/games.jsonl';
 const MOVE_DELAY_MS = 5000;
+const START_DELAY_MS = 1000;
 const END_PAUSE_MS = 3000;
 const RELOAD_MS = 60000;
 const RETRY_MS = 5000;
@@ -52,6 +53,12 @@ function applyMove(board, move) {
   return true;
 }
 
+function boardAt(moves, ply) {
+  const board = freshBoard();
+  for (let i = 0; i < ply; i++) applyMove(board, moves[i]);
+  return board;
+}
+
 function parseGames(text) {
   const games = [];
   for (const line of text.split('\n')) {
@@ -76,15 +83,19 @@ function resultLabel(result) {
 // ---- Page ----
 
 const $ = id => document.getElementById(id);
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const setStatus = text => { $('statusLine').textContent = text; };
 
 let board = null;
 let squares = [];
 let games = [];
 let current = -1;
-let runId = 0;
+let ply = 0;
+let playing = false;
+let timer = null;
 let query = '';
+
+const moveList = () => games[current]?.moves || [];
+const isLive = () => playing && current === games.length - 1;
 
 function buildBoard() {
   const el = $('board');
@@ -175,6 +186,90 @@ function matches() {
   return found;
 }
 
+function statusText() {
+  if (!playing) return 'Paused. Step with ← and →.';
+  if (ply >= moveList().length) {
+    return current + 1 < games.length ? 'Game finished.' : 'Game finished. Waiting for the next game…';
+  }
+  return isLive() ? 'Live' : 'Playing…';
+}
+
+function updateControls() {
+  $('prevBtn').disabled = current < 0 || ply === 0;
+  $('nextBtn').disabled = current < 0 || ply >= moveList().length;
+  $('playBtn').textContent = playing ? 'Pause' : 'Play';
+  $('liveBtn').hidden = isLive();
+  setStatus(statusText());
+}
+
+function updateView() {
+  const moves = moveList();
+  board = boardAt(moves, ply);
+  drawBoard(ply > 0 ? moves[ply - 1] : null);
+  $('plyProgress').textContent = `${ply} / ${moves.length}`;
+  updateControls();
+}
+
+// ---- Playback ----
+
+function schedule(ms) {
+  clearTimeout(timer);
+  if (playing) timer = setTimeout(advance, ms);
+}
+
+function advance() {
+  if (ply < moveList().length) {
+    ply++;
+    updateView();
+    schedule(ply === moveList().length ? END_PAUSE_MS : MOVE_DELAY_MS);
+  } else if (current + 1 < games.length) {
+    openGame(current + 1, true);
+  } else {
+    schedule(RETRY_MS);
+  }
+}
+
+function openGame(index, autoplay) {
+  const game = games[index];
+  current = index;
+  ply = 0;
+  playing = autoplay;
+
+  const { text, cls } = resultLabel(game.result);
+  $('gameId').textContent = game.id ? game.id.slice(0, 8) : '—';
+  $('gameNumber').textContent = `Game #${index}`;
+  $('modelStep').textContent = game.model_step ?? '—';
+  $('mctsIters').textContent = game.mcts_iterations ?? '—';
+  $('result').textContent = text;
+  $('result').className = 'v ' + cls;
+
+  drawList();
+  scrollToCurrent();
+  updateView();
+  schedule(START_DELAY_MS);
+}
+
+function step(delta) {
+  if (current < 0) return;
+  playing = false;
+  clearTimeout(timer);
+  ply = Math.min(Math.max(ply + delta, 0), moveList().length);
+  updateView();
+}
+
+function togglePlay() {
+  if (current < 0) return;
+  playing = !playing;
+  updateControls();
+  schedule(ply >= moveList().length ? START_DELAY_MS : MOVE_DELAY_MS);
+}
+
+function goLive() {
+  if (games.length) openGame(games.length - 1, true);
+}
+
+// ---- Loading and events ----
+
 async function reloadGames() {
   const res = await fetch(`${DATA_URL}?t=${Date.now()}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`${DATA_URL} -> ${res.status}`);
@@ -182,50 +277,11 @@ async function reloadGames() {
   $('gamesLogged').textContent = games.length;
 }
 
-async function play(index) {
-  const id = ++runId;
-  const game = games[index];
-  current = index;
-  board = freshBoard();
-  buildBoard();
-  drawBoard(null);
-  drawList();
-  scrollToCurrent();
-
-  $('gameId').textContent = game.id ? game.id.slice(0, 8) : '—';
-  $('gameNumber').textContent = `Game #${index}`;
-  $('modelStep').textContent = game.model_step ?? '—';
-  $('mctsIters').textContent = game.mcts_iterations ?? '—';
-  const { text, cls } = resultLabel(game.result);
-  $('result').textContent = text;
-  $('result').className = 'v ' + cls;
-  setStatus('Playing…');
-
-  const moves = game.moves || [];
-  for (let i = 0; i < moves.length; i++) {
-    if (!applyMove(board, moves[i])) {
-      console.warn(`Game #${index}, ply ${i + 1}: nothing on the from-square`, moves[i]);
-    }
-    drawBoard(moves[i]);
-    $('plyProgress').textContent = `${i + 1} / ${moves.length}`;
-    await sleep(MOVE_DELAY_MS);
-    if (id !== runId) return;
-  }
-
-  setStatus('Game finished.');
-
-  await sleep(END_PAUSE_MS);
-  while (id === runId && index + 1 >= games.length) {
-    setStatus('Waiting for the next game…');
-    await sleep(RETRY_MS);
-  }
-  if (id === runId) play(index + 1);
-}
-
 async function refresh() {
   try {
     await reloadGames();
     drawList();
+    updateControls();
   } catch (e) {
     console.error(e);
   }
@@ -234,7 +290,7 @@ async function refresh() {
 function wireEvents() {
   $('gameList').addEventListener('click', e => {
     const row = e.target.closest('.game-row');
-    if (row) play(Number(row.dataset.index));
+    if (row) openGame(Number(row.dataset.index), true);
   });
 
   $('gameSearch').addEventListener('input', e => {
@@ -248,7 +304,23 @@ function wireEvents() {
     if (e.key !== 'Enter' || !query) return;
     const exact = Number(query);
     const target = exact < games.length ? exact : matches()[0];
-    if (target !== undefined) play(target);
+    if (target !== undefined) openGame(target, true);
+  });
+
+  $('prevBtn').addEventListener('click', () => step(-1));
+  $('nextBtn').addEventListener('click', () => step(1));
+  $('playBtn').addEventListener('click', togglePlay);
+  $('liveBtn').addEventListener('click', goLive);
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      step(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      step(1);
+    }
   });
 }
 
@@ -258,6 +330,7 @@ async function main() {
   board = freshBoard();
   drawBoard(null);
   wireEvents();
+  updateControls();
 
   while (games.length === 0) {
     try {
@@ -267,16 +340,16 @@ async function main() {
       console.error(e);
       setStatus(`Couldn't load ${DATA_URL}. If you opened the file directly, serve it with python -m http.server.`);
     }
-    if (games.length === 0) await sleep(RETRY_MS);
+    if (games.length === 0) await new Promise(r => setTimeout(r, RETRY_MS));
   }
 
   const param = parseInt(new URLSearchParams(location.search).get('game'), 10);
-  play(param >= 0 && param < games.length ? param : games.length - 1);
+  openGame(param >= 0 && param < games.length ? param : games.length - 1, true);
   setInterval(refresh, RELOAD_MS);
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { freshBoard, applyMove, parseGames };
+  module.exports = { freshBoard, applyMove, boardAt, parseGames };
 } else {
   main();
 }
